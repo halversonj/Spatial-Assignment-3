@@ -5,26 +5,125 @@ date: "9/20/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+library(sf)
+library(tidyverse)
+library(ggthemes)
+library(ggspatial)
+library(units)
+library(nngeo)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+# Load the data
+```{r}
+cultural <- st_read("https://data.sfgov.org/api/geospatial/5xmc-5bjj?method=export&format=KML")
+planning <- st_read("https://data.sfgov.org/api/geospatial/ttns-6zj3?method=export&format=KML")
+buyouts <- st_read("https://data.sfgov.org/api/geospatial/wmam-7g8d?method=export&format=KML")
+inclusionary <- st_read("Residential_Projects_With_Inclusionary_Requirements.kml")
 ```
 
-## Including Plots
+# Transform the Data
+```{r}
+CA_zone_3 <- "+proj=lcc +lat_1=38.43333333333333 +lat_2=37.06666666666667 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs"
 
-You can also embed plots, for example:
+cultural <- cultural %>%
+  st_transform(CA_zone_3)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+buyouts <- buyouts %>%
+  st_transform(CA_zone_3)
+
+planning <- planning %>%
+  st_transform(CA_zone_3)
+
+inclusionary <- inclusionary %>%
+  st_transform(CA_zone_3)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Test Map
+```{r}
+ggplot() +
+  geom_sf(data= cultural, fill = "light blue", color = "gray") +
+  geom_sf(data = planning, fill = NA, color = "red") +
+  geom_sf(data = inclusionary, color = "orange", size = 0.01) +
+  geom_sf(data = buyouts, color = "darkgreen", size = 0.01) +
+  theme_map() +
+  annotation_scale()
+```
+
+# Buffer around points
+```{r}
+inclusionary_buffer <- st_buffer(inclusionary, dist = 400) %>%
+  st_union()
+
+ggplot(inclusionary_buffer) +
+  geom_sf() +
+  theme_map()
+```
+
+# Buyouts in Inclusionary Buffer
+```{r}
+buyouts_inclusionary <- buyouts[inclusionary_buffer,]
+
+ggplot(inclusionary_buffer) +
+  geom_sf() +
+  geom_sf(data = buyouts_inclusionary, 
+          color = "darkgreen", 
+          size = 0.01) +
+  theme_map()
+```
+
+# Join 2 Buyouts Data Frames into One
+```{r}
+buyouts <- buyouts %>%
+  st_join(buyouts_inclusionary) %>%
+  mutate(by_inclusionary = !is.na(Name.y))
+```
+
+# Number of Buyouts near Inclusionary
+```{r}
+n_inclusionary_buyouts <- sum(buyouts$by_inclusionary)
+
+n_inclusionary_buyouts
+```
+
+# % of all Buyouts near Inclusionary
+```{r}
+n_buyouts <- length(buyouts$by_inclusionary)
+
+pct_inclusionary_buyouts <- n_inclusionary_buyouts / n_buyouts
+
+pct_inclusionary_buyouts
+```
+
+# Map % of Buyouts near Inclusionary
+```{r}
+left_side  <- st_bbox(planning)$xmin
+top_side <- st_bbox(planning)$ymax
+
+ggplot(planning) +
+  geom_sf(fill = "lightblue", color = "black") +
+  geom_sf(data = buyouts, size = 0.01,
+          aes(color = by_inclusionary)) +
+  scale_color_manual(values = c("lightgreen", "darkgreen"),
+          name = "San Francisco Buyouts\nby distance to an Inclusionary Development Project", 
+          labels = c("No buyouts within 400 m",
+                     "Buyout within 400 m")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side, 
+           y = top_side, 
+           label = paste("Of the ", 
+                         prettyNum(n_buyouts, big.mark = ","),
+                         " buyouts in San Francisco\n", 
+                         prettyNum(n_inclusionary_buyouts, big.mark = ","),
+                         " (", 
+                         prettyNum(100*pct_inclusionary_buyouts, digits = 0),
+                         "%) are within 400\nmeters of an Inclusionary Development Project.",
+                         sep = ""),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
