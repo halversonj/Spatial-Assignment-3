@@ -1,7 +1,7 @@
 ---
 title: "Spatial Assignment 3"
 author: "Jack Halverson"
-date: "9/20/2021"
+date: "9/21/2021"
 output: html_document
 ---
 
@@ -14,116 +14,339 @@ library(units)
 library(nngeo)
 ```
 
-# Load the data
+# Load and transform data
 ```{r}
 cultural <- st_read("https://data.sfgov.org/api/geospatial/5xmc-5bjj?method=export&format=KML")
 planning <- st_read("https://data.sfgov.org/api/geospatial/ttns-6zj3?method=export&format=KML")
-buyouts <- st_read("https://data.sfgov.org/api/geospatial/wmam-7g8d?method=export&format=KML")
-inclusionary <- st_read("Residential_Projects_With_Inclusionary_Requirements.kml")
-```
+art <- st_read("https://data.sfgov.org/api/geospatial/cf6e-9e4j?method=export&format=KML")
+murals <- st_read("https://data.sfgov.org/api/geospatial/wg8w-68vc?method=export&format=KML")
 
-# Transform the Data
-```{r}
-CA_zone_3 <- "+proj=lcc +lat_1=38.43333333333333 +lat_2=37.06666666666667 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs"
+CA_zone_3 <- "+proj=lcc +lat_1=38.43333333333333 +lat_2=37.06666666666667 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000 +ellps=GRS80 +units=m +no_defs "
 
 cultural <- cultural %>%
-  st_transform(CA_zone_3)
-
-buyouts <- buyouts %>%
   st_transform(CA_zone_3)
 
 planning <- planning %>%
   st_transform(CA_zone_3)
 
-inclusionary <- inclusionary %>%
+art <- art %>%
+  st_transform(CA_zone_3)
+
+murals <- murals %>%
   st_transform(CA_zone_3)
 ```
 
-# Test Map
+# Number and proportion of 1% art projects near Murals
 ```{r}
-ggplot() +
-  geom_sf(data= cultural, fill = "light blue", color = "gray") +
-  geom_sf(data = planning, fill = NA, color = "red") +
-  geom_sf(data = inclusionary, color = "orange", size = 0.01) +
-  geom_sf(data = buyouts, color = "darkgreen", size = 0.01) +
-  theme_map() +
-  annotation_scale()
-```
-
-# Buffer around points
-```{r}
-inclusionary_buffer <- st_buffer(inclusionary, dist = 400) %>%
+murals_buffer <- st_buffer(murals, dist = 400) %>%
   st_union()
 
-ggplot(inclusionary_buffer) +
+ggplot(murals_buffer) +
   geom_sf() +
   theme_map()
-```
 
-# Buyouts in Inclusionary Buffer
-```{r}
-buyouts_inclusionary <- buyouts[inclusionary_buffer,]
 
-ggplot(inclusionary_buffer) +
+art_murals<- art[murals_buffer,]
+  
+ggplot(murals_buffer) +
   geom_sf() +
-  geom_sf(data = buyouts_inclusionary, 
+  geom_sf(data = art_murals, 
           color = "darkgreen", 
           size = 0.01) +
   theme_map()
-```
 
-# Join 2 Buyouts Data Frames into One
-```{r}
-buyouts <- buyouts %>%
-  st_join(buyouts_inclusionary) %>%
-  mutate(by_inclusionary = !is.na(Name.y))
-```
 
-# Number of Buyouts near Inclusionary
-```{r}
-n_inclusionary_buyouts <- sum(buyouts$by_inclusionary)
+art <- art %>%
+  st_join(art_murals) %>%
+  mutate(by_murals = !is.na(Description.y))
 
-n_inclusionary_buyouts
-```
 
-# % of all Buyouts near Inclusionary
-```{r}
-n_buyouts <- length(buyouts$by_inclusionary)
+n_murals_art <- sum(art$by_murals)
 
-pct_inclusionary_buyouts <- n_inclusionary_buyouts / n_buyouts
+n_murals_art
 
-pct_inclusionary_buyouts
-```
 
-# Map % of Buyouts near Inclusionary
-```{r}
+n_art <- length(art$by_murals)
+
+pct_murals_art <- n_murals_art / n_art
+
+pct_murals_art
+
+
 left_side  <- st_bbox(planning)$xmin
 top_side <- st_bbox(planning)$ymax
 
-ggplot(planning) +
-  geom_sf(fill = "lightblue", color = "black") +
-  geom_sf(data = buyouts, size = 0.01,
-          aes(color = by_inclusionary)) +
-  scale_color_manual(values = c("lightgreen", "darkgreen"),
-          name = "San Francisco Buyouts\nby distance to an Inclusionary Development Project", 
-          labels = c("No buyouts within 400 m",
-                     "Buyout within 400 m")) +
+ggplot() +
+  geom_sf(data = planning, fill = "light gray", color = "black") +
+  geom_sf(data = art, size = 1,
+          aes(color = by_murals)) +
+  scale_color_manual(values = c("red", "blue"),
+          name = "San Francisco 1% Art Projects \nby distance to a StreetSmArts Mural", 
+          labels = c("No StreetSmArts Mural within 400 m",
+                     "StreetSmArts Mural within 400 m")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side, 
+           y = top_side,
+           label = paste("Of the ", 
+                         prettyNum(n_art, big.mark = ","),
+                         " 1% Art Projects in San Francisco\n", 
+                         prettyNum(n_murals_art, big.mark = ","),
+                         " (", 
+                         prettyNum(100*pct_murals_art, digits = 0),
+                         "%) are within 400\nmeters of a StreetSmArts Mural.",
+                         sep = ""),
+           hjust = 0, vjust = 1, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+
+# Number and proportion of Murals near 1% art projects
+```{r}
+art_buffer <- st_buffer(art, dist = 400) %>%
+  st_union()
+
+ggplot(art_buffer) +
+  geom_sf() +
+  theme_map()
+
+
+murals_art <- murals[art_buffer,]
+  
+ggplot(art_buffer) +
+  geom_sf() +
+  geom_sf(data = murals_art, 
+          color = "darkgreen", 
+          size = 0.01) +
+  theme_map()
+
+
+murals <- murals %>%
+  st_join(murals_art) %>%
+  mutate(by_art = !is.na(Name.y))
+
+n_art_murals <- sum(murals$by_art)
+
+n_art_murals
+
+
+n_murals <- length(murals$by_art)
+
+pct_art_murals <- n_art_murals / n_murals
+
+pct_art_murals
+
+
+left_side  <- st_bbox(planning)$xmin
+top_side <- st_bbox(planning)$ymax
+
+ggplot() +
+  geom_sf(data = planning, fill = "light gray", color = "black") +
+  geom_sf(data = murals, size = 1,
+          aes(color = by_art)) +
+  scale_color_manual(values = c("red", "blue"),
+          name = "Boston Murals\nby distance to a parking meter", 
+          labels = c("No 1% Art within 30 m",
+                     "1% Art within 30 m")) +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
   annotate(geom = "text", x = left_side, 
            y = top_side, 
            label = paste("Of the ", 
-                         prettyNum(n_buyouts, big.mark = ","),
-                         " buyouts in San Francisco\n", 
-                         prettyNum(n_inclusionary_buyouts, big.mark = ","),
+                         prettyNum(n_murals, big.mark = ","),
+                         " trees in Boston\n", 
+                         prettyNum(n_art_murals, big.mark = ","),
                          " (", 
-                         prettyNum(100*pct_inclusionary_buyouts, digits = 0),
-                         "%) are within 400\nmeters of an Inclusionary Development Project.",
+                         prettyNum(100*pct_art_murals, digits = 0),
+                         "%) are within 30\nmeters of 1% art.",
                          sep = ""),
            hjust = 0, vjust = 0, size = 3) +
   theme_map() +
   theme(panel.background = element_rect(fill = "cornsilk1"),
         legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+
+# Number of 1% Art Projects in Planning Districts
+```{r}
+planning <- planning %>%
+  mutate(num_art = lengths(st_covers(planning, art)))
+
+ggplot(planning) +
+  geom_sf(color = NA, 
+          aes(fill = num_art)) +
+  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% Art Projects",
+                       breaks = breaks <- seq(0, 50, by = 10),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "art projects")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+
+# Number of Murals in Planning Districts
+```{r}
+planning <- planning %>%
+  mutate(num_murals = lengths(st_covers(planning, murals)))
+
+ggplot(planning) +
+  geom_sf(color = NA, 
+          aes(fill = num_murals)) +
+  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% Art Projects",
+                       breaks = breaks <- seq(0, 50, by = 10),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "murals")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+# Number of Murals in Cultural Districts
+```{r}
+cultural <- cultural %>%
+  mutate(num_murals = lengths(st_covers(cultural, murals)))
+
+ggplot() +
+  geom_sf(data = planning, fill = "light gray", color = "black") +
+  geom_sf(data = cultural, color = NA, 
+          aes(fill = num_murals)) +
+  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% Art Projects",
+                       breaks = breaks <- seq(0, 10, by = 2),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "murals")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+
+# Number of 1% Art Projects in Cultural Districts
+```{r}
+cultural <- cultural %>%
+  mutate(num_art = lengths(st_covers(cultural, art)))
+
+ggplot() +
+  geom_sf(data = planning, fill = "light gray", color = "black") +
+  geom_sf(data = cultural, color = NA, 
+          aes(fill = num_art)) +
+  geom_sf(data = art, size = 1, color = "red") +
+  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% Art Projects",
+                       breaks = breaks <- seq(0, 15, by = 10),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "art")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+
+
+
+# Number and proportion of Planning Districts that have Cultural Districts
+```{r}
+planning <- planning %>%
+  mutate(num_cultural = lengths(st_overlaps(planning, cultural))) %>%
+  mutate(has_cultural = num_cultural > 0)
+
+n_cultural_planning <- sum(planning$has_cultural)
+
+n_cultural_planning
+
+
+left_side  <- st_bbox(cultural)$xmin
+top_side <- st_bbox(cultural)$ymax
+
+ggplot(cultural) +
+  geom_sf(fill = "lightblue", color = NA) +
+  geom_sf(data = planning,
+          aes(fill = has_cultural)) +
+  scale_fill_manual(values = c("cornsilk1", "darkseagreen1"),
+          name = "Boston Neighborhoods\nby presence of Cultural Districts", 
+          labels = c("Neighborhood without\na Cultural District",
+                     "Neighborhood with an\n Cultural District")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side, 
+           y = top_side - 1000, 
+           label = paste(n_cultural_planning ,
+                         "of San Francisco's", 
+                         length(planning$Name),
+                         "Planning Districts contain\nor overlap with", 
+                         "Cultural Districts."),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "gray"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+
+```
+
+
+
+
+
+
+
+# Density of 1% art in Planning Districts
+```{r}
+planning <- planning %>%
+  mutate(area = set_units(st_area(planning), km^2)) %>%
+  mutate(art_dens = as.numeric(num_art / area))
+
+ggplot(planning) +
+  geom_sf(color = NA, 
+          aes(fill = art_dens)) +
+    scale_fill_viridis_c(name =
+                           "San Francisco Planning Districts\nby 1% Art density",
+                       breaks = breaks <- seq(0, 10, by = 5),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "1% Art Projects per square km")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.position = "right",
+    legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+# Density of Murals in Planning Districts
+```{r}
+planning <- planning %>%
+  mutate(area = set_units(st_area(planning), km^2)) %>%
+  mutate(murals_dens = as.numeric(num_murals / area))
+
+ggplot(planning) +
+  geom_sf(color = NA, 
+          aes(fill = murals_dens)) +
+    scale_fill_viridis_c(name =
+                           "San Francisco Planning Districts\nby Murals density",
+                       breaks = breaks <- seq(0, 5, by = 1),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "Murals per square km")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.position = "right",
+    legend.background = element_rect(fill = alpha("white", 0.5), 
                                          color = "gray"))
 ```
