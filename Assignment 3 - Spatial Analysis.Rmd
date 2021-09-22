@@ -1,11 +1,21 @@
 ---
+title: "Assignment 3 - Spatial Analysis"
+author: "Jack Halverson"
+date: "9/22/2021"
+output: html_document
+---
+
+---
 title: "Spatial Assignment "
 author: "M.C. Abbott, Manoel Pereira Neto, Jack Halverson"
 date: "9/22/2021"
 output: html_document
 ---
+# Introduction
+Intro text about data sets, team member contributions.
 
-```{r, results = FALSE}
+# Load packages
+```{r, results = FALSE, message = FALSE}
 library(sf)
 library(tidyverse)
 library(ggthemes)
@@ -15,7 +25,7 @@ library(nngeo)
 ```
 
 # Load and transform data
-```{r}
+```{r, results = FALSE, message = FALSE}
 cultural <- st_read("https://data.sfgov.org/api/geospatial/5xmc-5bjj?method=export&format=KML")
 planning <- st_read("https://data.sfgov.org/api/geospatial/ttns-6zj3?method=export&format=KML")
 buyouts <- st_read("https://data.sfgov.org/api/geospatial/wmam-7g8d?method=export&format=KML")
@@ -35,7 +45,85 @@ buyouts <- buyouts %>%
 inclusionary <- inclusionary %>%
   st_transform(CA_zone_3)
 ```
+# Average Number of Projects with Inclusionary Requirements in Planning Districts
+```{r}
+planning <- planning %>%
+  mutate(num_inclusionary = lengths(st_covers(planning, inclusionary)))
 
+
+right_side <- st_bbox(planning)$xmax
+left_side  <- st_bbox(planning)$xmin
+top_side <- st_bbox(planning)$ymax
+bottom_side <- st_bbox(planning)$ymin
+
+ggplot(planning) +
+  geom_sf(color = NA, 
+          aes(fill = num_inclusionary)) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000), 
+           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
+  scale_fill_viridis_c(name = "San Francisco Planning Districts\nby Projects with Inclusionary Requirements",
+                       breaks = breaks <- seq(0, 120, by = 20),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "projects")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray")) +
+  theme(legend.position = "right")
+```
+Text here about what the map says.
+
+
+# Average distance of Projects with Inclusionary Requirements from Rental Buyouts
+```{r, results = FALSE, message = FALSE}
+inclusionary <- inclusionary %>%
+  mutate(buyouts_dist = st_nn(inclusionary, buyouts, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(buyouts_dist = as.numeric(buyouts_dist))
+
+
+avg_buyouts_dist <- mean(inclusionary$buyouts_dist)
+
+avg_buyouts_dist
+
+
+right_side <- st_bbox(planning)$xmax
+left_side  <- st_bbox(planning)$xmin
+top_side <- st_bbox(planning)$ymax
+bottom_side <- st_bbox(planning)$ymin
+
+ggplot() +
+  geom_sf(data = planning,fill = "light gray", color = "black") +
+  geom_sf(data = inclusionary, size = 0.75,
+          aes(color = buyouts_dist)) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000), 
+           ylim = c(bottom_side-1000, top_side+3000), expand = FALSE) +
+  scale_color_viridis_c(name = 
+                          "San Francisco Projects with Inclusionary Requirements\nby distance to Rental Buyouts") +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side - 500, 
+           y = top_side + 500, 
+           label = paste("On average, a San Francisco Project\nwith Inclusionary Requirements\nis ", 
+                         prettyNum(avg_buyouts_dist, digits = 3),
+                         " meters from a Rental Buyout.",
+                         sep = ""),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray")) +
+  theme(legend.position = "right")
+```
+Text here about what the map says.
+
+
+
+# Other examples below
 # Number and proportion of buyouts near inclusionary
 ```{r}
 inclusionary_buffer <- st_buffer(inclusionary, dist = 400) %>%
@@ -195,36 +283,6 @@ theme_map() +
 ```
 
 
-# JACK - Average Number of Projects with Inclusionary Requirements in Planning Districts
-```{r}
-planning <- planning %>%
-  mutate(num_inclusionary = lengths(st_covers(planning, inclusionary)))
-
-
-right_side <- st_bbox(planning)$xmax
-left_side  <- st_bbox(planning)$xmin
-top_side <- st_bbox(planning)$ymax
-bottom_side <- st_bbox(planning)$ymin
-
-ggplot(planning) +
-  geom_sf(color = NA, 
-          aes(fill = num_inclusionary)) +
-  coord_sf(xlim = c(left_side-1000, right_side+1000), 
-           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
-  scale_fill_viridis_c(name = "San Francisco Planning Districts\nby Projects with Inclusionary Requirements",
-                       breaks = breaks <- seq(0, 120, by = 20),
-                       labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "projects")) +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-theme_map() +
-  theme(panel.background = element_rect(fill = "cornsilk1"),
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray")) +
-  theme(legend.position = "right")
-```
-
 # Density of inclusionary in Planning Districts
 ```{r}
 planning <- planning %>%
@@ -246,49 +304,6 @@ theme_map() +
   theme(legend.position = "right",
     legend.background = element_rect(fill = alpha("white", 0.5), 
                                          color = "gray"))
-```
-
-# JACK - Average distance of Projects with Inclusionary Requirements from Rental Buyouts
-```{r}
-inclusionary <- inclusionary %>%
-  mutate(buyouts_dist = st_nn(inclusionary, buyouts, 
-                           returnDist = TRUE)$dist) %>%
-  mutate(buyouts_dist = as.numeric(buyouts_dist))
-
-
-avg_buyouts_dist <- mean(inclusionary$buyouts_dist)
-
-avg_buyouts_dist
-
-
-right_side <- st_bbox(planning)$xmax
-left_side  <- st_bbox(planning)$xmin
-top_side <- st_bbox(planning)$ymax
-bottom_side <- st_bbox(planning)$ymin
-
-ggplot() +
-  geom_sf(data = planning,fill = "light gray", color = "black") +
-  geom_sf(data = inclusionary, size = 0.75,
-          aes(color = buyouts_dist)) +
-  coord_sf(xlim = c(left_side-1000, right_side+1000), 
-           ylim = c(bottom_side-1000, top_side+3000), expand = FALSE) +
-  scale_color_viridis_c(name = 
-                          "San Francisco Projects with Inclusionary Requirements\nby distance to Rental Buyouts") +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-  annotate(geom = "text", x = left_side - 500, 
-           y = top_side + 500, 
-           label = paste("On average, a San Francisco Project\nwith Inclusionary Requirements\nis ", 
-                         prettyNum(avg_buyouts_dist, digits = 3),
-                         " meters from a Rental Buyout.",
-                         sep = ""),
-           hjust = 0, vjust = 0, size = 3) +
-  theme_map() +
-  theme(panel.background = element_rect(fill = "cornsilk1"),
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray")) +
-  theme(legend.position = "right")
 ```
 
 # Number of inclusionary in Cultural Districts
