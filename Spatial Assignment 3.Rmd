@@ -350,3 +350,50 @@ theme_map() +
     legend.background = element_rect(fill = alpha("white", 0.5), 
                                          color = "gray"))
 ```
+
+
+# Average distance of 1% Art projects from Murals
+
+
+# Average distance of Murals from 1% Art projects
+```{r}
+murals <- murals %>%
+  mutate(art_dist = st_nn(murals, art, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(art_dist = as.numeric(art_dist))
+
+
+avg_art_dist <- mean(murals$art_dist)
+
+avg_art_dist
+
+
+right_side <- st_bbox(planning)$xmax
+left_side  <- st_bbox(planning)$xmin
+top_side <- st_bbox(planning)$ymax
+bottom_side <- st_bbox(planning)$ymin
+
+
+ggplot(planning) +
+  geom_sf(fill = "lightblue", color = NA) +
+  geom_sf(data = murals, size = 1,
+          aes(color = art_dist)) +
+  coord_sf(xlim = c(left_side, right_side), 
+           ylim = c(bottom_side, top_side), expand = FALSE) +
+  scale_color_viridis_c(name = 
+                          "San Francisco Murals\nby distance to a 1% Art Project") +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side + 300, 
+           y = top_side - 550, 
+           label = paste("On average, a San Francisco Mural\nis ", 
+                         prettyNum(avg_art_dist, digits = 3),
+                         " meters from a 1% Art Project.",
+                         sep = ""),
+           hjust = 0, vjust = 2, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
