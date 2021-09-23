@@ -22,6 +22,8 @@ For our team’s response to the assignment, we decided to break beyond the our 
  
 “BUYOUTS”: This point set is the mandated record of any tenant buyouts. Regulation of tenant buyouts went into effect in 2015.
 
+Point allocation: we worked through this project together for the initial data selection and tutorial. We each contributed 2 maps and would allocate as follows: M.C. - 10, Manoel - 10, Jack - 10
+
 ## Load packages
 ```{r, results = FALSE, message = FALSE}
 library(sf)
