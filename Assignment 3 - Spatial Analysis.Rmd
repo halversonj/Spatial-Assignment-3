@@ -11,10 +11,18 @@ author: "M.C. Abbott, Manoel Pereira Neto, Jack Halverson"
 date: "9/22/2021"
 output: html_document
 ---
-# Introduction
-Intro text about data sets, team member contributions.
+## Introduction
+For our team’s response to the assignment, we decided to break beyond the our Analyze Boston comfort zone to look at another open data rich city, the City of San Francisco. After reviewing the data available from their open portal, we landed on a mix of points and polygons that might help us tell a story of displacement in the city.
+ 
+“CULTURAL”: This polygon set identifies SF Board of Supervisors-recognized districts that, according to their designation, are distinguished by unique social and historical associations and living traditions. Cultural Districts are focal area for the Planning Department and the Mayor’s Office of Economic and Workforce Development for developing strategies for sustaining the living culture of the area.
+ 
+“PLANNING”: This polygon set identifies the city’s Planning Districts. Planning Districts are used mainly for analysis and management but are also in some parts of the General Plan.
+ 
+“INCLUSIONARY”: This point set is a list of the city’s residential projects with inclusionary requirements, part of the city’s Inclusionary Affordable Housing Program. Inclusionary zoning was established by Planning Code Section 415 (http://bit.ly/1ag0AmP), and applies to developments of 10 or more units.
+ 
+“BUYOUTS”: This point set is the mandated record of any tenant buyouts. Regulation of tenant buyouts went into effect in 2015.
 
-# Load packages
+## Load packages
 ```{r, results = FALSE, message = FALSE}
 library(sf)
 library(tidyverse)
@@ -24,7 +32,7 @@ library(units)
 library(nngeo)
 ```
 
-# Load and transform data
+## Load and transform data
 ```{r, results = FALSE, message = FALSE}
 cultural <- st_read("https://data.sfgov.org/api/geospatial/5xmc-5bjj?method=export&format=KML")
 planning <- st_read("https://data.sfgov.org/api/geospatial/ttns-6zj3?method=export&format=KML")
@@ -45,87 +53,8 @@ buyouts <- buyouts %>%
 inclusionary <- inclusionary %>%
   st_transform(CA_zone_3)
 ```
-# Average Number of Projects with Inclusionary Requirements in Planning Districts
-```{r}
-planning <- planning %>%
-  mutate(num_inclusionary = lengths(st_covers(planning, inclusionary)))
-
-
-right_side <- st_bbox(planning)$xmax
-left_side  <- st_bbox(planning)$xmin
-top_side <- st_bbox(planning)$ymax
-bottom_side <- st_bbox(planning)$ymin
-
-ggplot(planning) +
-  geom_sf(color = NA, 
-          aes(fill = num_inclusionary)) +
-  coord_sf(xlim = c(left_side-1000, right_side+1000), 
-           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
-  scale_fill_viridis_c(name = "San Francisco Planning Districts\nby Projects with Inclusionary Requirements",
-                       breaks = breaks <- seq(0, 120, by = 20),
-                       labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "projects")) +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-theme_map() +
-  theme(panel.background = element_rect(fill = "cornsilk1"),
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray")) +
-  theme(legend.position = "right")
-```
-Text here about what the map says.
-
-
-# Average distance of Projects with Inclusionary Requirements from Rental Buyouts
+## #1 Rental Buyouts in Buffers Zones of Development Projects with Inclusionary Requirements
 ```{r, results = FALSE, message = FALSE}
-inclusionary <- inclusionary %>%
-  mutate(buyouts_dist = st_nn(inclusionary, buyouts, 
-                           returnDist = TRUE)$dist) %>%
-  mutate(buyouts_dist = as.numeric(buyouts_dist))
-
-
-avg_buyouts_dist <- mean(inclusionary$buyouts_dist)
-
-avg_buyouts_dist
-
-
-right_side <- st_bbox(planning)$xmax
-left_side  <- st_bbox(planning)$xmin
-top_side <- st_bbox(planning)$ymax
-bottom_side <- st_bbox(planning)$ymin
-
-ggplot() +
-  geom_sf(data = planning,fill = "light gray", color = "black") +
-  geom_sf(data = inclusionary, size = 0.75,
-          aes(color = buyouts_dist)) +
-  coord_sf(xlim = c(left_side-1000, right_side+1000), 
-           ylim = c(bottom_side-1000, top_side+3000), expand = FALSE) +
-  scale_color_viridis_c(name = 
-                          "San Francisco Projects with Inclusionary Requirements\nby distance to Rental Buyouts") +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-  annotate(geom = "text", x = left_side - 500, 
-           y = top_side + 500, 
-           label = paste("On average, a San Francisco Project\nwith Inclusionary Requirements\nis ", 
-                         prettyNum(avg_buyouts_dist, digits = 3),
-                         " meters from a Rental Buyout.",
-                         sep = ""),
-           hjust = 0, vjust = 0, size = 3) +
-  theme_map() +
-  theme(panel.background = element_rect(fill = "cornsilk1"),
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray")) +
-  theme(legend.position = "right")
-```
-Text here about what the map says.
-
-
-
-# Other examples below
-# Number and proportion of buyouts near inclusionary
-```{r}
 inclusionary_buffer <- st_buffer(inclusionary, dist = 400) %>%
   st_union()
 
@@ -160,264 +89,222 @@ pct_inclusionary_buyouts <- n_inclusionary_buyouts / n_buyouts
 
 pct_inclusionary_buyouts
 
-
+ 
 left_side  <- st_bbox(planning)$xmin
 top_side <- st_bbox(planning)$ymax
+right_side <- st_bbox(planning)$xmax
+bottom_side <- st_bbox(planning)$ymin 
 
 ggplot() +
-  geom_sf(data = planning, fill = "light gray", color = "black") +
-  geom_sf(data = buyouts, size = 1,
+  geom_sf(data = planning, color = "black") +
+  geom_sf(data = buyouts, size = 0.01,
           aes(color = by_inclusionary)) +
-  scale_color_manual(values = c("red", "blue"),
-          name = "San Francisco 1% buyouts Projects \nby distance to a StreetSmbuyoutss Mural", 
-          labels = c("No StreetSmbuyoutss Mural within 400 m",
-                     "StreetSmbuyoutss Mural within 400 m")) +
+  scale_color_manual(values = c("lightgreen", "darkgreen"),
+          name = "SF Rental Buyouts by New Developments with Inclusionary Requirements",
+          labels = c("No Inclusionary Projects within 400m",
+                     "Inclusionary Projects within 400m")) +
+  coord_sf(xlim = c(left_side-5000, right_side+5000),
+           ylim = c(bottom_side-5000, top_side+10000), expand = FALSE) +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
-  annotate(geom = "text", x = left_side, 
-           y = top_side,
-           label = paste("Of the ", 
+  annotate(geom = "text",
+            x = left_side - 4000,
+            y = top_side + 5000,
+            label = paste ("Of the ",
                          prettyNum(n_buyouts, big.mark = ","),
-                         " 1% buyouts Projects in San Francisco\n", 
+                         " rental buyouts in SF\n",
                          prettyNum(n_inclusionary_buyouts, big.mark = ","),
-                         " (", 
+                         " (",
                          prettyNum(100*pct_inclusionary_buyouts, digits = 0),
-                         "%) are within 400\nmeters of a StreetSmbuyoutss Mural.",
+                         "%) are within 400\nmeters of a new development\nwith inclusionary requirements.",
                          sep = ""),
-           hjust = 0, vjust = 1, size = 3) +
+         
+            hjust = 0, vjust = 0, size = 2) +
   theme_map() +
   theme(panel.background = element_rect(fill = "cornsilk1"),
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
+        legend.background = element_rect(fill = alpha("white", 0.5),
+                                         color = "gray")) +
+  theme(legend.position = "right") +
+  ggtitle( "Rental Buyouts in Buffers Zones of Development Projects with Inclusionary Requirements")
 ```
 
-
-# Number and proportion of inclusionary near 1% buyouts projects
-```{r, }
-buyouts_buffer <- st_buffer(buyouts, dist = 400) %>%
-  st_union()
-
-ggplot(buyouts_buffer) +
-  geom_sf() +
-  theme_map()
+For this first map, we looked at the number and proportion of buyouts within one-quarter mile of a mandated inclusionary housing development projects. Given over half of buyouts take place within a quarter mile of an inclusionary project, it would seem that there is a prominent impact that these developments are having on the residential makeup of a neighborhood. What the map makes clear is a tension between the buyout (displacement) of existing residence, and efforts by the city to retain housing for essential, below-market-rate wage earners. A hypothesis we have is that those that are being bought out are not staying in the area, and instead mandated affordable housing is being filled by different populations, which ultimately undermines inclusionary mandates as an anti-displacement effort, but additional data would need to be found and/or produced to add the temporal dimension of where residents move to after a buyout.
 
 
-inclusionary_buyouts <- inclusionary[buyouts_buffer,]
-  
-ggplot(buyouts_buffer) +
-  geom_sf() +
-  geom_sf(data = inclusionary_buyouts, 
-          color = "darkgreen", 
-          size = 0.01) +
-  theme_map()
-
-
+## #3 Average distance of Projects with Inclusionary Requirements from Rental Buyouts
+```{r, results = FALSE, message = FALSE}
 inclusionary <- inclusionary %>%
-  st_join(inclusionary_buyouts) %>%
-  mutate(by_buyouts = !is.na(Name.y))
-
-n_buyouts_inclusionary <- sum(inclusionary$by_buyouts)
-
-n_buyouts_inclusionary
+  mutate(buyouts_dist = st_nn(inclusionary, buyouts, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(buyouts_dist = as.numeric(buyouts_dist))
 
 
-n_inclusionary <- length(inclusionary$by_buyouts)
+avg_buyouts_dist <- mean(inclusionary$buyouts_dist)
 
-pct_buyouts_inclusionary <- n_buyouts_inclusionary / n_inclusionary
-
-pct_buyouts_inclusionary
+avg_buyouts_dist
 
 
+right_side <- st_bbox(planning)$xmax
 left_side  <- st_bbox(planning)$xmin
 top_side <- st_bbox(planning)$ymax
+bottom_side <- st_bbox(planning)$ymin
 
 ggplot() +
-  geom_sf(data = planning, fill = "light gray", color = "black") +
-  geom_sf(data = inclusionary, size = 1,
-          aes(color = by_buyouts)) +
-  scale_color_manual(values = c("red", "blue"),
-          name = "Boston inclusionary\nby distance to a parking meter", 
-          labels = c("No 1% buyouts within 30 m",
-                     "1% buyouts within 30 m")) +
+  geom_sf(data = planning,fill = "light gray", color = "black") +
+  geom_sf(data = inclusionary, size = 0.75,
+          aes(color = buyouts_dist)) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000), 
+           ylim = c(bottom_side-1500, top_side+3000), expand = FALSE) +
+  scale_color_viridis_c(name = 
+                          "San Francisco Projects with Inclusionary Requirements\nby distance to Rental Buyouts") +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
-  annotate(geom = "text", x = left_side, 
-           y = top_side, 
-           label = paste("Of the ", 
-                         prettyNum(n_inclusionary, big.mark = ","),
-                         " trees in Boston\n", 
-                         prettyNum(n_buyouts_inclusionary, big.mark = ","),
-                         " (", 
-                         prettyNum(100*pct_buyouts_inclusionary, digits = 0),
-                         "%) are within 30\nmeters of 1% buyouts.",
+  annotate(geom = "text", x = left_side - 500, 
+           y = top_side + 500, 
+           label = paste("On average, a San Francisco Project\nwith Inclusionary Requirements\nis ", 
+                         prettyNum(avg_buyouts_dist, digits = 3),
+                         " meters from a Rental Buyout.",
                          sep = ""),
            hjust = 0, vjust = 0, size = 3) +
   theme_map() +
   theme(panel.background = element_rect(fill = "cornsilk1"),
         legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
+                                         color = "gray")) +
+  theme(legend.position = "right") +
+  ggtitle( "Average distance of Projects with Inclusionary Requirements from Rental Buyouts")
 ```
 
+Building on the previous analysis, for this map, we looked at the average distance between a mandated inclusionary housing development project and the nearest buyout. This maps provides a finer tune on the map above, with an explicit calculation of the average distance, a mere 134 meters between an inclusionary mandated project and a buyout.
 
-# Number of buyouts in Planning Districts
+
+## #5: Number and Proportion of Rental Buyouts within Cultural Districts
 ```{r}
-planning <- planning %>%
-  mutate(num_buyouts = lengths(st_covers(planning, buyouts)))
-
-ggplot(planning) +
-  geom_sf(color = NA, 
+ 
+cultural <- cultural %>%
+  mutate(num_buyouts = lengths(st_covers(cultural, buyouts)))
+ggplot() +
+  geom_sf(data = planning, fill = "light gray", color = "black") +
+  geom_sf(data = cultural, color = NA,
           aes(fill = num_buyouts)) +
-  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% buyouts Projects",
-                       breaks = breaks <- seq(0, 50, by = 10),
+  scale_fill_viridis_c(name = "Number and proportion of \nBuyouts within Cultural Districts",
+                       breaks = breaks <- seq(0, 500, by = 80),
                        labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "buyouts projects")) +
+                                      "Buyout")) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000),
+           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
 theme_map() +
-  theme(panel.background = element_rect(fill = "cornsilk1"), 
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
+theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5),
+                                         color = "gray")) +
+  theme(legend.position = "right")+
+ 
+ggtitle( "The Number and Proportion of Buyouts within Cultural Districts")
+ 
 ```
 
+Digging into the cultural angle of displacement, we wanted to take a closer look at the number and proportion of buyouts within cultural districts. Cultural districts are designated as such in an effort by the city to retain the “living culture” of the area. While additional numerical data might be helpful to understand the magnitude being considered here, what’s clear is that in particular, the city’s neighborhood of SOMA – designated as the city’s Filipino Cultural Heritage District – is being most aggressively transformed through the mechanism of buyouts.
 
-# Density of inclusionary in Planning Districts
-```{r}
-planning <- planning %>%
-  mutate(area = set_units(st_area(planning), km^2)) %>%
-  mutate(inclusionary_dens = as.numeric(num_inclusionary / area))
 
-ggplot(planning) +
-  geom_sf(color = NA, 
-          aes(fill = inclusionary_dens)) +
-    scale_fill_viridis_c(name =
-                           "San Francisco Planning Districts\nby inclusionary density",
-                       breaks = breaks <- seq(0, 100, by = 10),
-                       labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "inclusionary per square km")) +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-theme_map() +
-  theme(legend.position = "right",
-    legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
-```
-
-# Number of inclusionary in Cultural Districts
+## #7 The Number of Inclusionary Projects within Cultural Districts
 ```{r}
 cultural <- cultural %>%
   mutate(num_inclusionary = lengths(st_covers(cultural, inclusionary)))
-
 ggplot() +
   geom_sf(data = planning, fill = "light gray", color = "black") +
-  geom_sf(data = cultural, color = NA, 
+  geom_sf(data = cultural, color = NA,
           aes(fill = num_inclusionary)) +
-  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% buyouts Projects",
-                       breaks = breaks <- seq(0, 10, by = 2),
+  scale_fill_viridis_c(name = "Number and proportion\nof Inclusionary Projects\nwithin Cultural Districts",
+                       breaks = breaks <- seq(0, 100, by = 10),
                        labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "inclusionary")) +
+                                      "projects")) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000),
+           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
 theme_map() +
-  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
+theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5),
+                                         color = "gray")) +
+  theme(legend.position = "right") +
+  ggtitle( "Number of Inclusionary Projects within Cultural Districts")
 ```
 
-
-# Number of buyouts in Cultural Districts
-```{r}
-cultural <- cultural %>%
-  mutate(num_buyouts = lengths(st_covers(cultural, buyouts)))
-
-ggplot() +
-  geom_sf(data = planning, fill = "light gray", color = "black") +
-  geom_sf(data = cultural, color = NA, 
-          aes(fill = num_buyouts)) +
-  scale_fill_viridis_c(name = "San Francisco planning districts\nby number of 1% buyouts Projects",
-                       breaks = breaks <- seq(0, 15, by = 10),
-                       labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "buyouts")) +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-theme_map() +
-  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
-```
+In conversation with our previous map, we see once again that the neighborhood of SOMA is the location of the highest number of inclusionary mandated housing developments. What we know from our personal experience is that this area has been consumed in the last 5 years by the spillover of the tech industry, a mixture of office space, commercial development and housing all catered to the tech industry. While the data here doesn’t go granular into WHO is subject to the buyouts, it’s likely given the high percentage of buyouts that the efforts have not been successful in retaining its cultural vibrancy, which puts into question the effectiveness of the city’s inclusionary mandate mechanism.
 
 
-
-
-# Number and proportion of Planning Districts that have Cultural Districts
+## #18 Average Number of Projects with Inclusionary Requirements in Planning Districts
 ```{r}
 planning <- planning %>%
-  mutate(num_cultural = lengths(st_overlaps(planning, cultural))) %>%
-  mutate(has_cultural = num_cultural > 0)
-
-n_cultural_planning <- sum(planning$has_cultural)
-
-n_cultural_planning
+  mutate(num_inclusionary = lengths(st_covers(planning, inclusionary)))
 
 
-left_side  <- st_bbox(cultural)$xmin
-top_side <- st_bbox(cultural)$ymax
-
-ggplot(cultural) +
-  geom_sf(fill = "lightblue", color = NA) +
-  geom_sf(data = planning,
-          aes(fill = has_cultural)) +
-  scale_fill_manual(values = c("cornsilk1", "darkseagreen1"),
-          name = "Boston Neighborhoods\nby presence of Cultural Districts", 
-          labels = c("Neighborhood without\na Cultural District",
-                     "Neighborhood with an\n Cultural District")) +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tr",
-                         style = north_arrow_minimal()) +
-  annotate(geom = "text", x = left_side, 
-           y = top_side - 1000, 
-           label = paste(n_cultural_planning ,
-                         "of San Francisco's", 
-                         length(planning$Name),
-                         "Planning Districts contain\nor overlap with", 
-                         "Cultural Districts."),
-           hjust = 0, vjust = 0, size = 3) +
-  theme_map() +
-  theme(panel.background = element_rect(fill = "gray"),
-        legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
-
-```
-
-
-
-
-
-
-
-# Density of 1% buyouts in Planning Districts
-```{r}
-planning <- planning %>%
-  mutate(area = set_units(st_area(planning), km^2)) %>%
-  mutate(buyouts_dens = as.numeric(num_buyouts / area))
+right_side <- st_bbox(planning)$xmax
+left_side  <- st_bbox(planning)$xmin
+top_side <- st_bbox(planning)$ymax
+bottom_side <- st_bbox(planning)$ymin
 
 ggplot(planning) +
   geom_sf(color = NA, 
-          aes(fill = buyouts_dens)) +
-    scale_fill_viridis_c(name =
-                           "San Francisco Planning Districts\nby 1% buyouts density",
-                       breaks = breaks <- seq(0, 1000, by = 100),
+          aes(fill = num_inclusionary)) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000), 
+           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
+  scale_fill_viridis_c(name = "San Francisco Planning Districts\nby Projects with Inclusionary Requirements",
+                       breaks = breaks <- seq(0, 120, by = 20),
                        labels = paste(prettyNum(breaks, big.mark = ","),
-                                      "1% buyouts Projects per square km")) +
+                                      "projects")) +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
 theme_map() +
-  theme(legend.position = "right",
-    legend.background = element_rect(fill = alpha("white", 0.5), 
-                                         color = "gray"))
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray")) +
+  theme(legend.position = "right") +
+  ggtitle( "Average Number of Projects with Inclusionary Requirements in Planning Districts")
 ```
 
+In this map, we are analyzing the number of mandated inclusionary housing development projects in each planning district. This map might tell us something about the political landscape of the city, an understanding of which districts are focused on density in their housing developments, given the inclusionary requirement for buildings over 10 units. Here we again see SOMA, despite its Cultural District designation, as the epicenter of dense development for the city. Of course this map doesn’t provide the nuance of where exactly in this large tract the density is focused, and it would be interested to see if within this area there are particular “hot zones” for dense, vertical growth, compared to areas where projects are of a smaller size.
+
+
+## #20 Density of Rental Buyouts in Planning Districts
+```{r}
+planning <- planning %>%
+  mutate(area = set_units(st_area(planning), km^2)) %>%
+  mutate(buyouts_dens = as.numeric(n_buyouts / area)) 
+
+right_side <- st_bbox(planning)$xmax
+  left_side  <- st_bbox(planning)$xmin
+  top_side <- st_bbox(planning)$ymax
+  bottom_side <- st_bbox(planning)$ymin
+ 
+  ggplot() +
+  geom_sf(data = planning, color = NA, aes(fill = buyouts_dens)) +
+  scale_fill_viridis_c(name = 
+                           "San Francisco Planning Districts\nby Buyout Density",
+                       breaks = breaks <- seq(0, 4000, by = 500),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "buyouts per square km")) +
+  coord_sf(xlim = c(left_side-1000, right_side+1000),
+           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
+ 
+ 
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+ 
+   
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5),
+                                         color = "gray")) +
+  theme(legend.position = "right") +
+  ggtitle( "Density of Rental Buyouts in Planning Districts")
+```
+
+This map looks at the density of buyouts in each planning district, with the purpose of attributing a sense of urgency and responsibility to certain areas. The planning districts, which are built on census tracts, seem to give us less of a nuanced story than the cultural district mapping. Instead what we see here is a high desnity of buyouts concentrated with the neighborhoods of the Haight-Ashbury. Although this is not the SOMA neighborhood as previously analyzed, what we know both visually and anecdotally is that the Haight-Ashbury neighborhood benefits from a direct connection to the newly tech rich neighborhoods of SOMA and Civic Center, which may account for its buyout density.
